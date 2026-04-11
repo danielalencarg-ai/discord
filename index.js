@@ -1,5 +1,7 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, Events } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
 
 const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
@@ -15,6 +17,19 @@ const redeEmojis = {
     'Poker King': '♣️'
 };
 const redes = ['ChampionPoker', '888Poker', 'PokerStars', 'Poker King'];
+
+const tempoJogadoresPath = path.join(__dirname, 'tempo_jogadores.json');
+let temposAcumulados = {};
+
+// Carregar dados existentes
+try {
+    if (fs.existsSync(tempoJogadoresPath)) {
+        const data = fs.readFileSync(tempoJogadoresPath, 'utf8');
+        temposAcumulados = JSON.parse(data);
+    }
+} catch (error) {
+    console.error('Erro ao carregar tempos acumulados:', error);
+}
 
 function gerarPainelEmbed() {
     const embed = new EmbedBuilder()
@@ -69,6 +84,14 @@ function formatarDuracao(ms) {
     }
 }
 
+function salvarTempos() {
+    try {
+        fs.writeFileSync(tempoJogadoresPath, JSON.stringify(temposAcumulados, null, 2), 'utf8');
+    } catch (error) {
+        console.error('Erro ao salvar tempos acumulados:', error);
+    }
+}
+
 function gerarStatsEmbed() {
     const embed = new EmbedBuilder()
         .setColor('#5865F2')
@@ -112,6 +135,39 @@ function gerarStatsEmbed() {
     }
 
     embed.addFields({ name: '🎰 Jogadores Ativos', value: listaAtivos });
+    return embed;
+}
+
+function gerarRelatorioEmbed() {
+    const embed = new EmbedBuilder()
+        .setColor('#5865F2')
+        .setTitle('📊 RELATÓRIO DE TEMPO TOTAL')
+        .setThumbnail('attachment://logo.jpg')
+        .setFooter({ text: 'Elite Team Poker • Bot', iconURL: 'attachment://logo.jpg' })
+        .setTimestamp();
+
+    // Converter objeto em array e ordenar por totalMs decrescente
+    const entries = Object.entries(temposAcumulados);
+    if (entries.length === 0) {
+        embed.addFields({ name: '📭 Nenhum dado acumulado', value: 'Ainda não há sessões registradas.' });
+        return embed;
+    }
+
+    const sorted = entries.sort((a, b) => b[1].totalMs - a[1].totalMs);
+    const medalhas = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+    let lista = '';
+    sorted.forEach(([userId, dados], index) => {
+        const medalha = index < medalhas.length ? medalhas[index] : `${index + 1}️⃣`;
+        const tempoFormatado = formatarDuracao(dados.totalMs);
+        lista += `${medalha} **<@${userId}>** – ${tempoFormatado} (${dados.sessoes} sess${dados.sessoes !== 1 ? 'ões' : 'ão'})\n\n`;
+    });
+
+    // Truncar se exceder 1024 caracteres
+    if (lista.length > 1024) {
+        lista = lista.substring(0, 1021) + '...';
+    }
+
+    embed.addFields({ name: '🏆 Ranking de Tempo Total', value: lista });
     return embed;
 }
 
@@ -177,6 +233,9 @@ client.on(Events.MessageCreate, async (message) => {
     } else if (message.content === '!stats') {
         await message.channel.send({ embeds: [gerarStatsEmbed()], files: ['logo.jpg'] });
         await message.delete().catch(() => {});
+    } else if (message.content === '!relatorio') {
+        await message.channel.send({ embeds: [gerarRelatorioEmbed()], files: ['logo.jpg'] });
+        await message.delete().catch(() => {});
     }
 });
 
@@ -213,6 +272,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
             }
         }
         if (interaction.customId === 'btn_sair') {
+            // Acumular tempo da sessão
+            const dados = jogadoresAtivos.get(interaction.user.id);
+            if (dados && dados.startTime) {
+                const duracao = Date.now() - dados.startTime;
+                const userId = interaction.user.id;
+                if (!temposAcumulados[userId]) {
+                    temposAcumulados[userId] = { totalMs: 0, sessoes: 0 };
+                }
+                temposAcumulados[userId].totalMs += duracao;
+                temposAcumulados[userId].sessoes += 1;
+                salvarTempos();
+            }
             jogadoresAtivos.delete(interaction.user.id);
             await interaction.update({ embeds: [gerarPainelEmbed()], components: gerarBotoes(), files: ['logo.jpg'] });
         }
