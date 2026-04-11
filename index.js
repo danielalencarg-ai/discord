@@ -9,6 +9,7 @@ const client = new Client({
 
 const jogadoresAtivos = new Map();
 const panelMessages = new Map(); // channelId -> messageId
+const rankingMessages = new Map(); // channelId -> messageId
 const selecoesPendentes = new Map(); // userId -> { site }
 const redeEmojis = {
     'ChampionPoker': '♠️',
@@ -205,9 +206,33 @@ async function atualizarTodosPaineis() {
     });
 }
 
+async function atualizarTodosRankings() {
+    rankingMessages.forEach(async (messageId, channelId) => {
+        try {
+            const channel = await client.channels.fetch(channelId);
+            const message = await channel.messages.fetch(messageId);
+            await message.edit({ embeds: [gerarRelatorioEmbed()], files: ['logo.jpg'] });
+        } catch (error) {
+            // Ranking deletado, remover do mapa
+            rankingMessages.delete(channelId);
+        }
+    });
+}
+
 client.once(Events.ClientReady, (c) => {
     console.log(`✅ Bot online! Logado como ${c.user.tag}`);
-    setInterval(atualizarTodosPaineis, 60000); // 60 segundos
+    setInterval(async () => {
+        try {
+            await atualizarTodosPaineis();
+        } catch (error) {
+            console.error('Erro ao atualizar painéis:', error);
+        }
+        try {
+            await atualizarTodosRankings();
+        } catch (error) {
+            console.error('Erro ao atualizar rankings:', error);
+        }
+    }, 60000); // 60 segundos
 });
 
 client.on(Events.MessageCreate, async (message) => {
@@ -234,7 +259,22 @@ client.on(Events.MessageCreate, async (message) => {
         await message.channel.send({ embeds: [gerarStatsEmbed()], files: ['logo.jpg'] });
         await message.delete().catch(() => {});
     } else if (message.content === '!relatorio') {
-        await message.channel.send({ embeds: [gerarRelatorioEmbed()], files: ['logo.jpg'] });
+        const channelId = message.channel.id;
+        const existingRankingId = rankingMessages.get(channelId);
+        if (existingRankingId) {
+            try {
+                const rankingMessage = await message.channel.messages.fetch(existingRankingId);
+                await rankingMessage.edit({ embeds: [gerarRelatorioEmbed()], files: ['logo.jpg'] });
+                await message.delete().catch(() => {});
+                return;
+            } catch (error) {
+                // Message likely deleted, remove from map and send new
+                rankingMessages.delete(channelId);
+            }
+        }
+        // Send new ranking and store its ID
+        const rankingMessage = await message.channel.send({ embeds: [gerarRelatorioEmbed()], files: ['logo.jpg'] });
+        rankingMessages.set(channelId, rankingMessage.id);
         await message.delete().catch(() => {});
     }
 });
@@ -286,6 +326,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
             }
             jogadoresAtivos.delete(interaction.user.id);
             await interaction.update({ embeds: [gerarPainelEmbed()], components: gerarBotoes(), files: ['logo.jpg'] });
+            try {
+                await atualizarTodosRankings();
+            } catch (error) {
+                console.error('Erro ao atualizar rankings:', error);
+            }
         }
     }
     if (interaction.isModalSubmit() && interaction.customId === 'modal_grind') {
