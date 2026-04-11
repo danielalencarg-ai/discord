@@ -57,6 +57,7 @@ Isso significa que o bot está conectado ao Discord e pronto para uso.
    !painel
    ```
 3. O bot enviará o painel de status com os botões **🟢 Entrar no Grind** e **🔴 Encerrar Sessão**
+   - O painel agora exibe um contador de tempo (⏱️) ao lado de cada jogador, mostrando há quanto tempo ele está na sessão. O contador é atualizado automaticamente a cada minuto.
 4. Clique nos botões e preencha o formulário para ver a atualização em tempo real
 
 ---

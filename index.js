@@ -35,7 +35,8 @@ function gerarPainelEmbed() {
         jogadoresAtivos.forEach((dados, userId) => {
             const emoji = emojis[index % emojis.length];
             const siteEmoji = redeEmojis[dados.site] || '🌐';
-            entries.push(`${emoji} **<@${userId}>** | ${siteEmoji} **${dados.site}** | 💰 **${dados.buyin}**`);
+            const tempo = dados.startTime ? formatarDuracao(Date.now() - dados.startTime) : '0s';
+            entries.push(`${emoji} **<@${userId}>** | ${siteEmoji} **${dados.site}** | 💰 **${dados.buyin}** | ⏱️ **${tempo}**`);
             index++;
         });
         listaAtivos = entries.join('\n\n'); // double line spacing
@@ -53,6 +54,19 @@ function gerarPainelEmbed() {
 function extrairValorBuyin(str) {
     const match = str.match(/[+-]?\d+(?:\.\d+)?/);
     return match ? parseFloat(match[0]) : 0;
+}
+
+function formatarDuracao(ms) {
+    const segundos = Math.floor(ms / 1000);
+    const minutos = Math.floor(segundos / 60);
+    const horas = Math.floor(minutos / 60);
+    if (horas > 0) {
+        return `${horas}h ${minutos % 60}m`;
+    } else if (minutos > 0) {
+        return `${minutos}m ${segundos % 60}s`;
+    } else {
+        return `${segundos}s`;
+    }
 }
 
 function gerarStatsEmbed() {
@@ -122,8 +136,23 @@ function gerarBotoes() {
     return [row];
 }
 
+async function atualizarTodosPaineis() {
+    panelMessages.forEach(async (messageId, channelId) => {
+        try {
+            const channel = await client.channels.fetch(channelId);
+            const message = await channel.messages.fetch(messageId);
+            await message.edit({ embeds: [gerarPainelEmbed()], components: gerarBotoes(), files: ['logo.jpg'] });
+        } catch (error) {
+            // Painel deletado, remover do mapa
+            panelMessages.delete(channelId);
+        }
+    });
+}
 
-client.once(Events.ClientReady, (c) => console.log(`✅ Bot online! Logado como ${c.user.tag}`));
+client.once(Events.ClientReady, (c) => {
+    console.log(`✅ Bot online! Logado como ${c.user.tag}`);
+    setInterval(atualizarTodosPaineis, 60000); // 60 segundos
+});
 
 client.on(Events.MessageCreate, async (message) => {
     if (message.author.bot) return;
@@ -204,7 +233,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         buyin = buyin.replace(/\n/g, '').substring(0, 50);
         jogadoresAtivos.set(interaction.user.id, {
             site: pending.site,
-            buyin: buyin
+            buyin: buyin,
+            startTime: Date.now()
         });
         selecoesPendentes.delete(interaction.user.id);
         
