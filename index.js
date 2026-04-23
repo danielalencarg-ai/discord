@@ -213,30 +213,29 @@ function gerarRelatorioEmbed() {
 }
 
 function gerarBotoes() {
-    // Network buttons + Encerrar Sessão in a single row
-    const buttons = redes.map(rede =>
+    const buttonsRede = redes.map(rede =>
         new ButtonBuilder()
             .setCustomId('btn_rede_' + rede)
             .setLabel(rede)
             .setEmoji(redeEmojis[rede])
             .setStyle(ButtonStyle.Primary)
     );
-    buttons.push(
+    const rowRede = new ActionRowBuilder().addComponents(...buttonsRede);
+
+    const buttonsAcao = [
         new ButtonBuilder()
             .setCustomId('btn_nick_sala')
             .setLabel('Nick Sala')
-            .setStyle(ButtonStyle.Secondary)
-    );
-    // Add Encerrar Sessão button
-    buttons.push(
+            .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
             .setCustomId('btn_sair')
             .setLabel('Encerrar Sessão')
             .setEmoji('🔴')
             .setStyle(ButtonStyle.Danger)
-    );
-    const row = new ActionRowBuilder().addComponents(...buttons);
-    return [row];
+    ];
+    const rowAcao = new ActionRowBuilder().addComponents(...buttonsAcao);
+
+    return [rowRede, rowAcao];
 }
 
 async function atualizarTodosPaineis() {
