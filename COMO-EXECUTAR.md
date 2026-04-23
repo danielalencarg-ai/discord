@@ -6,7 +6,7 @@ Siga estes passos para colocar o bot online no seu servidor.
 
 ## 1. Preparação
 
-- Você já tem o token do bot no arquivo `.env` (foi preenchido automaticamente)
+- Você precisa definir o token do bot no arquivo `.env`
 - As dependências já estão instaladas (pasta `node_modules`)
 
 ---
@@ -78,7 +78,8 @@ Isso significa que o bot está conectado ao Discord e pronto para uso.
 ## Arquivos Importantes
 
 - [`index.js`](index.js) – código do bot
-- [`.env`](.env) – token do bot (já preenchido)
+- [`.env`](.env) – variáveis locais do bot
+- [`.env.example`](.env.example) – exemplo sem segredo
 - [`package.json`](package.json) – configuração do projeto
 - [`README.md`](README.md) – documentação completa
 - [`GUIA-DISCORD.md`](GUIA-DISCORD.md) – guia detalhado de configuração no portal

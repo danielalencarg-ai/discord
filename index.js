@@ -3,6 +3,10 @@ const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder
 const fs = require('fs');
 const path = require('path');
 
+if (!process.env.TOKEN_DO_BOT) {
+    throw new Error('TOKEN_DO_BOT não configurado. Defina a variável de ambiente antes de iniciar o bot.');
+}
+
 const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
 });
@@ -21,6 +25,16 @@ const redes = ['ChampionPoker', '888Poker', 'PokerStars', 'Poker King'];
 
 const tempoJogadoresPath = path.join(__dirname, 'tempo_jogadores.json');
 let temposAcumulados = {};
+
+function obterNomeExibicao(userId) {
+    for (const guild of client.guilds.cache.values()) {
+        const member = guild.members.cache.get(userId);
+        if (member) {
+            return member.displayName || member.user?.username || `<@${userId}>`;
+        }
+    }
+    return `<@${userId}>`;
+}
 
 // Carregar dados existentes
 try {
@@ -52,7 +66,8 @@ function gerarPainelEmbed() {
             const emoji = emojis[index % emojis.length];
             const siteEmoji = redeEmojis[dados.site] || '🌐';
             const tempo = dados.startTime ? formatarDuracao(Date.now() - dados.startTime) : '0s';
-            entries.push(`${emoji} **<@${userId}>** | ${siteEmoji} **${dados.site}** | 💰 **${dados.buyin}** | ⏱️ **${tempo}**`);
+            const nome = dados.displayName || obterNomeExibicao(userId);
+            entries.push(`${emoji} **${nome}** | ${siteEmoji} **${dados.site}** | 💰 **${dados.buyin}** | ⏱️ **${tempo}**`);
             index++;
         });
         listaAtivos = entries.join('\n\n'); // double line spacing
@@ -125,7 +140,8 @@ function gerarStatsEmbed() {
         jogadoresAtivos.forEach((dados, userId) => {
             const emoji = emojis[index % emojis.length];
             const siteEmoji = redeEmojis[dados.site] || '🌐';
-            entries.push(`${emoji} **<@${userId}>** | ${siteEmoji} **${dados.site}** | 💰 **${dados.buyin}**`);
+            const nome = dados.displayName || obterNomeExibicao(userId);
+            entries.push(`${emoji} **${nome}** | ${siteEmoji} **${dados.site}** | 💰 **${dados.buyin}**`);
             index++;
         });
         listaAtivos = entries.join('\n\n');
@@ -160,7 +176,8 @@ function gerarRelatorioEmbed() {
     sorted.forEach(([userId, dados], index) => {
         const medalha = index < medalhas.length ? medalhas[index] : `${index + 1}️⃣`;
         const tempoFormatado = formatarDuracao(dados.totalMs);
-        lista += `${medalha} **<@${userId}>** – ${tempoFormatado} (${dados.sessoes} sess${dados.sessoes !== 1 ? 'ões' : 'ão'})\n\n`;
+        const nome = dados.displayName || obterNomeExibicao(userId);
+        lista += `${medalha} **${nome}** – ${tempoFormatado} (${dados.sessoes} sess${dados.sessoes !== 1 ? 'ões' : 'ão'})\n\n`;
     });
 
     // Truncar se exceder 1024 caracteres
@@ -350,7 +367,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         jogadoresAtivos.set(interaction.user.id, {
             site: pending.site,
             buyin: buyin,
-            startTime: Date.now()
+            startTime: Date.now(),
+            displayName: interaction.member?.displayName || interaction.user.globalName || interaction.user.username
         });
         selecoesPendentes.delete(interaction.user.id);
         

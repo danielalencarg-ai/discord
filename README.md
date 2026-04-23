@@ -14,7 +14,7 @@ Bot para gerenciar sessões de grind do time de poker, com painel dinâmico e in
 
 - Node.js 16.9.0 ou superior
 - Conta de desenvolvedor no Discord
-- Token de um bot do Discord com as intents adequadas
+- Variável de ambiente `TOKEN_DO_BOT` configurada com o token do bot
 
 ## Instalação
 
@@ -30,8 +30,8 @@ Bot para gerenciar sessões de grind do time de poker, com painel dinâmico e in
    ```
 
 3. Configure o token do bot:
-   - Renomeie o arquivo `.env.example` para `.env` (ou edite o `.env` existente)
-   - Substitua `cole_seu_token_aqui` pelo token real do seu bot
+   - Crie ou edite o arquivo `.env`
+   - Defina `TOKEN_DO_BOT` com o token real do seu bot
 
 4. Execute o bot:
    ```bash
@@ -46,7 +46,7 @@ Bot para gerenciar sessões de grind do time de poker, com painel dinâmico e in
    - `GUILDS`
    - `GUILD_MESSAGES`
    - `MESSAGE_CONTENT`
-4. Copie o token do bot e cole no arquivo `.env`
+4. Copie o token do bot e defina a variável `TOKEN_DO_BOT` no `.env`
 5. Convide o bot para seu servidor usando a URL de convite gerada (com escopo `bot` e permissões adequadas)
 
 ## Uso
@@ -63,7 +63,8 @@ Bot para gerenciar sessões de grind do time de poker, com painel dinâmico e in
 discord/
 ├── index.js          # Código principal do bot
 ├── package.json      # Dependências e scripts
-├── .env              # Variáveis de ambiente (token)
+├── .env              # Variáveis de ambiente locais
+├── .env.example      # Exemplo sem segredo
 ├── .gitignore        # Arquivos ignorados pelo Git
 └── README.md         # Este arquivo
 ```

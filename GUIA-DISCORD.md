@@ -27,7 +27,7 @@ Este guia explica como configurar o bot no Discord Developer Portal, gerar o lin
 2. Clique no botão **"Add Bot"** (confirme com "Yes, do it!")
 3. Agora você verá a seção do bot com o nome, ícone e token.
 
-**Importante:** O token do bot já foi inserido automaticamente no arquivo `.env` do projeto. Não compartilhe esse token com ninguém.
+**Importante:** O token do bot deve ser configurado localmente no arquivo `.env` ou por variável de ambiente. Não compartilhe esse token com ninguém.
 
 ---
 
@@ -52,13 +52,13 @@ O bot precisa de certas permissões para ler mensagens e interagir.
 
 ---
 
-## 5. Copiar o Token (Opcional – já está no .env)
+## 5. Copiar o Token
 
 Se precisar recriar o token:
 
 1. Na seção **"Bot"**, clique em **"Reset Token"** (somente se o token atual tiver vazado)
 2. Copie o novo token (aparece em uma caixa de texto)
-3. Substitua o valor no arquivo `.env` do projeto pela nova string.
+3. Substitua o valor no arquivo `.env` do projeto pela nova string, ou atualize a variável de ambiente da hospedagem.
 
 ---
 
