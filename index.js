@@ -131,6 +131,10 @@ function obterNickSala(userId) {
     return nicksSalas[userId] || null;
 }
 
+function obterNomeRelatorio(userId, dados) {
+    return (dados && dados.nickSala) || nicksSalas[userId] || (dados && dados.displayName) || obterNomeExibicao(userId);
+}
+
 function gerarStatsEmbed() {
     const embed = new EmbedBuilder()
         .setColor('#5865F2')
@@ -199,7 +203,7 @@ function gerarRelatorioEmbed() {
     sorted.forEach(([userId, dados], index) => {
         const medalha = index < medalhas.length ? medalhas[index] : `${index + 1}️⃣`;
         const tempoFormatado = formatarDuracao(dados.totalMs);
-        const nome = dados.nickSala || dados.displayName || obterNomeExibicao(userId);
+        const nome = obterNomeRelatorio(userId, dados);
         lista += `${medalha} **${nome}** – ${tempoFormatado} (${dados.sessoes} sess${dados.sessoes !== 1 ? 'ões' : 'ão'})\n\n`;
     });
 
@@ -380,6 +384,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 }
                 temposAcumulados[userId].totalMs += duracao;
                 temposAcumulados[userId].sessoes += 1;
+                temposAcumulados[userId].nickSala = dados.nickSala || temposAcumulados[userId].nickSala || null;
+                temposAcumulados[userId].displayName = dados.displayName || temposAcumulados[userId].displayName || null;
                 salvarTempos();
             }
             jogadoresAtivos.delete(interaction.user.id);
@@ -468,6 +474,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
         nicksSalas[interaction.user.id] = nickSala;
         salvarNicksSalas();
         selecoesPendentes.delete(interaction.user.id);
+
+        if (!temposAcumulados[interaction.user.id]) {
+            temposAcumulados[interaction.user.id] = { totalMs: 0, sessoes: 0 };
+        }
+        temposAcumulados[interaction.user.id].nickSala = nickSala;
+        salvarTempos();
 
         const dadosAtivos = jogadoresAtivos.get(interaction.user.id);
         if (dadosAtivos) {
