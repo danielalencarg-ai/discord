@@ -381,9 +381,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 const inputBuyin = new TextInputBuilder()
                     .setCustomId('input_buyin')
                     .setLabel('\u200b')
-                    .setPlaceholder(obterBuyinSalvo(interaction.user.id) ? `Último: ${obterBuyinSalvo(interaction.user.id)}` : 'Ex: $50, $10')
+                    .setPlaceholder('Ex: $50, $10')
                     .setStyle(TextInputStyle.Short)
                     .setRequired(true);
+                const buyinSalvo = obterBuyinSalvo(interaction.user.id);
+                if (buyinSalvo) {
+                    inputBuyin.setValue(buyinSalvo);
+                }
                 modal.addComponents(new ActionRowBuilder().addComponents(inputBuyin));
                 await interaction.showModal(modal);
             }
