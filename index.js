@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, Events } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, Events } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
@@ -14,7 +14,7 @@ const client = new Client({
 const jogadoresAtivos = new Map();
 const panelMessages = new Map(); // channelId -> messageId
 const rankingMessages = new Map(); // channelId -> messageId
-const selecoesPendentes = new Map(); // userId -> { site }
+const selecoesPendentes = new Map(); // userId -> { site, action }
 const redeEmojis = {
     'ChampionPoker': '♠️',
     '888Poker': '♥️',
@@ -24,7 +24,9 @@ const redeEmojis = {
 const redes = ['ChampionPoker', '888Poker', 'PokerStars', 'Poker King'];
 
 const tempoJogadoresPath = path.join(__dirname, 'tempo_jogadores.json');
+const nickSalasPath = path.join(__dirname, 'nick_salas.json');
 let temposAcumulados = {};
+let nicksSalas = {};
 
 function obterNomeExibicao(userId) {
     for (const guild of client.guilds.cache.values()) {
@@ -44,6 +46,15 @@ try {
     }
 } catch (error) {
     console.error('Erro ao carregar tempos acumulados:', error);
+}
+
+try {
+    if (fs.existsSync(nickSalasPath)) {
+        const data = fs.readFileSync(nickSalasPath, 'utf8');
+        nicksSalas = JSON.parse(data);
+    }
+} catch (error) {
+    console.error('Erro ao carregar nicks de sala:', error);
 }
 
 function gerarPainelEmbed() {
@@ -66,7 +77,7 @@ function gerarPainelEmbed() {
             const emoji = emojis[index % emojis.length];
             const siteEmoji = redeEmojis[dados.site] || '🌐';
             const tempo = dados.startTime ? formatarDuracao(Date.now() - dados.startTime) : '0s';
-            const nome = dados.displayName || obterNomeExibicao(userId);
+            const nome = dados.nickSala || dados.displayName || obterNomeExibicao(userId);
             entries.push(`${emoji} **${nome}** | ${siteEmoji} **${dados.site}** | 💰 **${dados.buyin}** | ⏱️ **${tempo}**`);
             index++;
         });
@@ -108,6 +119,18 @@ function salvarTempos() {
     }
 }
 
+function salvarNicksSalas() {
+    try {
+        fs.writeFileSync(nickSalasPath, JSON.stringify(nicksSalas, null, 2), 'utf8');
+    } catch (error) {
+        console.error('Erro ao salvar nicks de sala:', error);
+    }
+}
+
+function obterNickSala(userId) {
+    return nicksSalas[userId] || null;
+}
+
 function gerarStatsEmbed() {
     const embed = new EmbedBuilder()
         .setColor('#5865F2')
@@ -140,7 +163,7 @@ function gerarStatsEmbed() {
         jogadoresAtivos.forEach((dados, userId) => {
             const emoji = emojis[index % emojis.length];
             const siteEmoji = redeEmojis[dados.site] || '🌐';
-            const nome = dados.displayName || obterNomeExibicao(userId);
+            const nome = dados.nickSala || dados.displayName || obterNomeExibicao(userId);
             entries.push(`${emoji} **${nome}** | ${siteEmoji} **${dados.site}** | 💰 **${dados.buyin}**`);
             index++;
         });
@@ -176,7 +199,7 @@ function gerarRelatorioEmbed() {
     sorted.forEach(([userId, dados], index) => {
         const medalha = index < medalhas.length ? medalhas[index] : `${index + 1}️⃣`;
         const tempoFormatado = formatarDuracao(dados.totalMs);
-        const nome = dados.displayName || obterNomeExibicao(userId);
+        const nome = dados.nickSala || dados.displayName || obterNomeExibicao(userId);
         lista += `${medalha} **${nome}** – ${tempoFormatado} (${dados.sessoes} sess${dados.sessoes !== 1 ? 'ões' : 'ão'})\n\n`;
     });
 
@@ -197,6 +220,12 @@ function gerarBotoes() {
             .setLabel(rede)
             .setEmoji(redeEmojis[rede])
             .setStyle(ButtonStyle.Primary)
+    );
+    buttons.push(
+        new ButtonBuilder()
+            .setCustomId('btn_nick_sala')
+            .setLabel('Nick Sala')
+            .setStyle(ButtonStyle.Secondary)
     );
     // Add Encerrar Sessão button
     buttons.push(
@@ -321,12 +350,25 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 }
             } else {
                 // Player not active → store pending selection and show modal
-                selecoesPendentes.set(interaction.user.id, { site: selectedSite });
+                selecoesPendentes.set(interaction.user.id, { site: selectedSite, action: 'grind' });
                 const modal = new ModalBuilder().setCustomId('modal_grind').setTitle('\u200b');
                 const inputBuyin = new TextInputBuilder().setCustomId('input_buyin').setLabel('\u200b').setPlaceholder('Ex: $50, $10').setStyle(TextInputStyle.Short).setRequired(true);
                 modal.addComponents(new ActionRowBuilder().addComponents(inputBuyin));
                 await interaction.showModal(modal);
             }
+        }
+        if (interaction.customId === 'btn_nick_sala') {
+            selecoesPendentes.set(interaction.user.id, { action: 'nick_sala' });
+            const modal = new ModalBuilder().setCustomId('modal_nick_sala').setTitle('\u200b');
+            const inputNick = new TextInputBuilder()
+                .setCustomId('input_nick_sala')
+                .setLabel('\u200b')
+                .setPlaceholder(obterNickSala(interaction.user.id) || 'Ex: João, Mesa 12, Grinder X')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setMaxLength(40);
+            modal.addComponents(new ActionRowBuilder().addComponents(inputNick));
+            await interaction.showModal(modal);
         }
         if (interaction.customId === 'btn_sair') {
             // Acumular tempo da sessão
@@ -352,7 +394,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
     if (interaction.isModalSubmit() && interaction.customId === 'modal_grind') {
         const pending = selecoesPendentes.get(interaction.user.id);
-        if (!pending) {
+        if (!pending || pending.action !== 'grind') {
             await interaction.reply({ content: '\u200b', flags: 64 });
             try {
                 await interaction.deleteReply();
@@ -368,7 +410,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
             site: pending.site,
             buyin: buyin,
             startTime: Date.now(),
-            displayName: interaction.member?.displayName || interaction.user.globalName || interaction.user.username
+            displayName: interaction.member?.displayName || interaction.user.globalName || interaction.user.username,
+            nickSala: obterNickSala(interaction.user.id)
         });
         selecoesPendentes.delete(interaction.user.id);
         
@@ -391,6 +434,67 @@ client.on(Events.InteractionCreate, async (interaction) => {
             panelMessages.set(channelId, newPanel.id);
         }
         
+        await interaction.reply({ content: '\u200b', flags: 64 });
+        try {
+            await interaction.deleteReply();
+        } catch (error) {
+            // Ignore
+        }
+    }
+    if (interaction.isModalSubmit() && interaction.customId === 'modal_nick_sala') {
+        const pending = selecoesPendentes.get(interaction.user.id);
+        if (!pending || pending.action !== 'nick_sala') {
+            await interaction.reply({ content: '\u200b', flags: 64 });
+            try {
+                await interaction.deleteReply();
+            } catch (error) {
+                // Ignore
+            }
+            return;
+        }
+
+        let nickSala = interaction.fields.getTextInputValue('input_nick_sala');
+        nickSala = nickSala.replace(/\n/g, '').trim().substring(0, 40);
+
+        if (!nickSala) {
+            await interaction.reply({ content: '\u200b', flags: 64 });
+            try {
+                await interaction.deleteReply();
+            } catch (error) {
+                // Ignore
+            }
+            return;
+        }
+
+        nicksSalas[interaction.user.id] = nickSala;
+        salvarNicksSalas();
+        selecoesPendentes.delete(interaction.user.id);
+
+        const dadosAtivos = jogadoresAtivos.get(interaction.user.id);
+        if (dadosAtivos) {
+            dadosAtivos.nickSala = nickSala;
+            jogadoresAtivos.set(interaction.user.id, dadosAtivos);
+        }
+
+        const channelId = interaction.channelId;
+        const panelMessageId = panelMessages.get(channelId);
+        if (panelMessageId) {
+            try {
+                const panelMessage = await interaction.channel.messages.fetch(panelMessageId);
+                await panelMessage.edit({ embeds: [gerarPainelEmbed()], components: gerarBotoes(), files: ['logo.jpg'] });
+            } catch (error) {
+                panelMessages.delete(channelId);
+                const newPanel = await interaction.channel.send({ embeds: [gerarPainelEmbed()], components: gerarBotoes(), files: ['logo.jpg'] });
+                panelMessages.set(channelId, newPanel.id);
+            }
+        }
+
+        try {
+            await atualizarTodosRankings();
+        } catch (error) {
+            console.error('Erro ao atualizar rankings:', error);
+        }
+
         await interaction.reply({ content: '\u200b', flags: 64 });
         try {
             await interaction.deleteReply();
