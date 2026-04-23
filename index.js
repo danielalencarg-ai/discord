@@ -25,8 +25,10 @@ const redes = ['ChampionPoker', '888Poker', 'PokerStars', 'Poker King'];
 
 const tempoJogadoresPath = path.join(__dirname, 'tempo_jogadores.json');
 const nickSalasPath = path.join(__dirname, 'nick_salas.json');
+const buyinsSalvosPath = path.join(__dirname, 'buyins_salvos.json');
 let temposAcumulados = {};
 let nicksSalas = {};
+let buyinsSalvos = {};
 
 function obterNomeExibicao(userId) {
     for (const guild of client.guilds.cache.values()) {
@@ -55,6 +57,15 @@ try {
     }
 } catch (error) {
     console.error('Erro ao carregar nicks de sala:', error);
+}
+
+try {
+    if (fs.existsSync(buyinsSalvosPath)) {
+        const data = fs.readFileSync(buyinsSalvosPath, 'utf8');
+        buyinsSalvos = JSON.parse(data);
+    }
+} catch (error) {
+    console.error('Erro ao carregar buy-ins salvos:', error);
 }
 
 function gerarPainelEmbed() {
@@ -127,8 +138,20 @@ function salvarNicksSalas() {
     }
 }
 
+function salvarBuyinsSalvos() {
+    try {
+        fs.writeFileSync(buyinsSalvosPath, JSON.stringify(buyinsSalvos, null, 2), 'utf8');
+    } catch (error) {
+        console.error('Erro ao salvar buy-ins salvos:', error);
+    }
+}
+
 function obterNickSala(userId) {
     return nicksSalas[userId] || null;
+}
+
+function obterBuyinSalvo(userId) {
+    return buyinsSalvos[userId] || null;
 }
 
 function obterNomeRelatorio(userId, dados) {
@@ -355,7 +378,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 // Player not active → store pending selection and show modal
                 selecoesPendentes.set(interaction.user.id, { site: selectedSite, action: 'grind' });
                 const modal = new ModalBuilder().setCustomId('modal_grind').setTitle('\u200b');
-                const inputBuyin = new TextInputBuilder().setCustomId('input_buyin').setLabel('\u200b').setPlaceholder('Ex: $50, $10').setStyle(TextInputStyle.Short).setRequired(true);
+                const inputBuyin = new TextInputBuilder()
+                    .setCustomId('input_buyin')
+                    .setLabel('\u200b')
+                    .setPlaceholder(obterBuyinSalvo(interaction.user.id) ? `Último: ${obterBuyinSalvo(interaction.user.id)}` : 'Ex: $50, $10')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
                 modal.addComponents(new ActionRowBuilder().addComponents(inputBuyin));
                 await interaction.showModal(modal);
             }
@@ -386,6 +414,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 temposAcumulados[userId].sessoes += 1;
                 temposAcumulados[userId].nickSala = dados.nickSala || temposAcumulados[userId].nickSala || null;
                 temposAcumulados[userId].displayName = dados.displayName || temposAcumulados[userId].displayName || null;
+                temposAcumulados[userId].lastBuyin = dados.buyin || temposAcumulados[userId].lastBuyin || null;
                 salvarTempos();
             }
             jogadoresAtivos.delete(interaction.user.id);
@@ -411,6 +440,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         let buyin = interaction.fields.getTextInputValue('input_buyin');
         // Sanitize buy‑in: remove newlines and limit length
         buyin = buyin.replace(/\n/g, '').substring(0, 50);
+        buyinsSalvos[interaction.user.id] = buyin;
+        salvarBuyinsSalvos();
         jogadoresAtivos.set(interaction.user.id, {
             site: pending.site,
             buyin: buyin,
